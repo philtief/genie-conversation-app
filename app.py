@@ -66,7 +66,7 @@ def result_to_df(statement_response) -> pd.DataFrame:
     names = [c.name for c in cols]
     types = [c.type_name.value if hasattr(c.type_name, "value") else str(c.type_name) for c in cols]
     rows = (statement_response.result.data_array if statement_response.result else None) or []
-    coerced = [[_coerce(v, t) for v, t in zip(row, types)] for row in rows]
+    coerced = [[_coerce(v, t) for v, t in zip(row, types, strict=False)] for row in rows]
     return pd.DataFrame(coerced, columns=names)
 
 

@@ -114,6 +114,17 @@ The "Rerun edited SQL" button feeds the edited SQL into the [SQL Statement Execu
 - Results arrive synchronously up to a default chunk size (a few thousand rows). For larger results, page through the Statement Execution API after the first chunk.
 - Clarification turns from Genie come back as text-only attachments (no `query`). TopGenie shows the text.
 
+## Development
+
+Lint with [ruff](https://docs.astral.sh/ruff/):
+
+```bash
+uvx ruff check .
+uvx ruff check --fix .   # auto-fix
+```
+
+Configuration in [`pyproject.toml`](pyproject.toml).
+
 ## License
 
 Apache 2.0. See [LICENSE](LICENSE).

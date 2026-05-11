@@ -2,6 +2,7 @@
 import ast
 import pathlib
 
+
 def test_app_parses():
     src = pathlib.Path(__file__).parent / "app.py"
     ast.parse(src.read_text())

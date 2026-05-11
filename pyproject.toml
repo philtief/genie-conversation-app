@@ -1,0 +1,30 @@
+[project]
+name = "topgenie"
+version = "0.1.0"
+description = "Custom Databricks App on top of the Genie Conversation API"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+dependencies = [
+    "streamlit>=1.39",
+    "databricks-sdk>=0.40",
+    "pandas>=2.1",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "W",   # pycodestyle warnings
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # function calls in defaults (st.cache_resource patterns)
+]

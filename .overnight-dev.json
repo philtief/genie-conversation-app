@@ -1,5 +1,5 @@
 {
-  "lintCommand": "uvx pyflakes app.py",
+  "lintCommand": "uvx ruff check .",
   "testCommand": "python3 test_syntax.py",
   "autoFix": false,
   "minCoverage": 0
