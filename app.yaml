@@ -9,8 +9,10 @@ command:
   - "--server.headless"
   - "true"
 
-env:
-  - name: GENIE_SPACE_ID
-    value: "REPLACE_WITH_YOUR_GENIE_SPACE_ID"
-  - name: DATABRICKS_WAREHOUSE_ID
-    value: "REPLACE_WITH_YOUR_WAREHOUSE_ID"
+# Optional. If unset, the app shows a sidebar dropdown listing every Genie
+# space the app's service principal can access. Set to pin to one space.
+# env:
+#   - name: GENIE_SPACE_ID
+#     value: "<your-genie-space-id>"
+#   - name: DATABRICKS_WAREHOUSE_ID
+#     value: "<your-warehouse-id>"

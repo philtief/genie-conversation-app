@@ -11,18 +11,29 @@ from __future__ import annotations
 
 import os
 
+import matplotlib.pyplot as plt
 import pandas as pd
+import seaborn as sns
+import sqlparse
 import streamlit as st
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.dashboards import MessageStatus
 from databricks.sdk.service.sql import StatementState
 
-SPACE_ID = os.environ["GENIE_SPACE_ID"]
+
+def format_sql(sql: str) -> str:
+    if not sql:
+        return ""
+    try:
+        return sqlparse.format(sql, reindent=True, keyword_case="upper", strip_comments=False)
+    except Exception:
+        return sql
+
+PINNED_SPACE_ID = os.environ.get("GENIE_SPACE_ID")
 WAREHOUSE_ID = os.environ.get("DATABRICKS_WAREHOUSE_ID")
 
 st.set_page_config(page_title="TopGenie", page_icon=":bar_chart:", layout="wide")
 st.title("TopGenie")
-st.caption(f"Genie space: `{SPACE_ID}`. Ask a question, see the SQL, the chart, and download the result.")
 
 
 @st.cache_resource
@@ -32,11 +43,19 @@ def get_client() -> WorkspaceClient:
     return WorkspaceClient(profile=os.environ.get("DATABRICKS_PROFILE", "DEFAULT"))
 
 
-@st.cache_resource
-def get_warehouse_id() -> str:
+@st.cache_data(ttl=60)
+def list_spaces() -> list[tuple[str, str]]:
+    w = get_client()
+    try:
+        return [(s.space_id, s.title or s.space_id) for s in (w.genie.list_spaces().spaces or [])]
+    except Exception:
+        return []
+
+
+def get_warehouse_id(space_id: str) -> str:
     if WAREHOUSE_ID:
         return WAREHOUSE_ID
-    return get_client().genie.get_space(space_id=SPACE_ID).warehouse_id
+    return get_client().genie.get_space(space_id=space_id).warehouse_id
 
 
 def _coerce(v, type_name: str):
@@ -70,22 +89,22 @@ def result_to_df(statement_response) -> pd.DataFrame:
     return pd.DataFrame(coerced, columns=names)
 
 
-def ask_genie(question: str, conversation_id: str | None):
+def ask_genie(space_id: str, question: str, conversation_id: str | None):
     w = get_client()
     if conversation_id:
         return w.genie.create_message_and_wait(
-            space_id=SPACE_ID, conversation_id=conversation_id, content=question
+            space_id=space_id, conversation_id=conversation_id, content=question
         )
-    return w.genie.start_conversation_and_wait(space_id=SPACE_ID, content=question)
+    return w.genie.start_conversation_and_wait(space_id=space_id, content=question)
 
 
-def fetch_result(msg) -> pd.DataFrame | None:
+def fetch_result(space_id: str, msg) -> pd.DataFrame | None:
     qa = next((a for a in (msg.attachments or []) if a.query), None)
     if not qa:
         return None
     w = get_client()
     r = w.genie.get_message_attachment_query_result(
-        space_id=SPACE_ID,
+        space_id=space_id,
         conversation_id=msg.conversation_id,
         message_id=msg.message_id or msg.id,
         attachment_id=qa.attachment_id,
@@ -95,6 +114,24 @@ def fetch_result(msg) -> pd.DataFrame | None:
         st.error(f"Query did not succeed: {sr.status.state}")
         return None
     return result_to_df(sr)
+
+
+sns.set_theme(style="whitegrid", context="talk", palette="rocket")
+
+
+def _format_axis(ax, x_label, y_label, title=None):
+    ax.set_xlabel(x_label, fontsize=11, color="#444")
+    ax.set_ylabel(y_label, fontsize=11, color="#444")
+    if title:
+        ax.set_title(title, fontsize=13, weight="bold", pad=12)
+    ax.tick_params(axis="x", labelsize=9, rotation=30)
+    ax.tick_params(axis="y", labelsize=9)
+    for spine in ("top", "right"):
+        ax.spines[spine].set_visible(False)
+    for spine in ("left", "bottom"):
+        ax.spines[spine].set_color("#bbb")
+    ax.yaxis.grid(True, linestyle=":", linewidth=0.6, color="#ccc")
+    ax.xaxis.grid(False)
 
 
 def render_chart(df: pd.DataFrame, key: str):
@@ -123,15 +160,26 @@ def render_chart(df: pd.DataFrame, key: str):
     y = c3.selectbox("Y axis", y_options, index=y_options.index(y_default) if y_default in y_options else 0, key=f"y_{key}")
 
     try:
-        plot_df = df[[x, y]]
+        plot_df = df[[x, y]].dropna()
+        fig, ax = plt.subplots(figsize=(9, 4.5), dpi=110)
+        fig.patch.set_facecolor("#fafafa")
+        ax.set_facecolor("#fafafa")
+
         if chart_type == "Bar":
-            st.bar_chart(plot_df, x=x, y=y, use_container_width=True)
+            order = plot_df.sort_values(y, ascending=False)[x].tolist()
+            sns.barplot(data=plot_df, x=x, y=y, ax=ax, order=order, hue=x, palette="rocket", legend=False)
         elif chart_type == "Line":
-            st.line_chart(plot_df, x=x, y=y, use_container_width=True)
+            sns.lineplot(data=plot_df, x=x, y=y, ax=ax, marker="o", linewidth=2.2, color="#9C27B0")
         elif chart_type == "Area":
-            st.area_chart(plot_df, x=x, y=y, use_container_width=True)
+            sns.lineplot(data=plot_df, x=x, y=y, ax=ax, linewidth=2.2, color="#9C27B0")
+            ax.fill_between(plot_df[x], plot_df[y], alpha=0.25, color="#9C27B0")
         elif chart_type == "Scatter":
-            st.scatter_chart(plot_df, x=x, y=y, use_container_width=True)
+            sns.scatterplot(data=plot_df, x=x, y=y, ax=ax, s=70, color="#E91E63", edgecolor="white")
+
+        _format_axis(ax, x, y)
+        fig.tight_layout()
+        st.pyplot(fig, use_container_width=True)
+        plt.close(fig)
     except Exception as e:
         st.warning(f"Could not render chart: {e}")
 
@@ -140,8 +188,34 @@ if "history" not in st.session_state:
     st.session_state.history = []
 if "conversation_id" not in st.session_state:
     st.session_state.conversation_id = None
+if "space_id" not in st.session_state:
+    st.session_state.space_id = PINNED_SPACE_ID
 
 with st.sidebar:
+    st.subheader("Genie space")
+    if PINNED_SPACE_ID:
+        st.code(PINNED_SPACE_ID, language=None)
+        st.caption("Pinned via `GENIE_SPACE_ID`.")
+    else:
+        spaces = list_spaces()
+        if spaces:
+            labels = {f"{title} ({sid[:8]}...)": sid for sid, title in spaces}
+            current = next((k for k, v in labels.items() if v == st.session_state.space_id), None)
+            choice = st.selectbox(
+                "Pick a space", list(labels.keys()),
+                index=list(labels.keys()).index(current) if current else 0,
+            )
+            if labels[choice] != st.session_state.space_id:
+                st.session_state.space_id = labels[choice]
+                st.session_state.history = []
+                st.session_state.conversation_id = None
+                st.rerun()
+        else:
+            manual = st.text_input("Genie space ID", value=st.session_state.space_id or "")
+            if manual:
+                st.session_state.space_id = manual
+
+    st.divider()
     st.subheader("Conversation")
     if st.session_state.conversation_id:
         st.code(st.session_state.conversation_id, language=None)
@@ -160,21 +234,27 @@ with st.sidebar:
         "- **Download** as CSV"
     )
 
+SPACE_ID = st.session_state.space_id
+if not SPACE_ID:
+    st.info("Pick a Genie space in the sidebar to start.")
+    st.stop()
+st.caption(f"Genie space: `{SPACE_ID}`. Ask a question, see the SQL, the chart, and download the result.")
+
 prompt = st.chat_input("Ask Genie about the data...")
 if prompt:
     with st.spinner("Asking Genie..."):
         try:
-            msg = ask_genie(prompt, st.session_state.conversation_id)
+            msg = ask_genie(SPACE_ID, prompt, st.session_state.conversation_id)
             st.session_state.conversation_id = msg.conversation_id
             if msg.status != MessageStatus.COMPLETED:
                 st.error(f"Genie returned status {msg.status}")
             else:
                 qa = next((a for a in (msg.attachments or []) if a.query), None)
                 ta = next((a for a in (msg.attachments or []) if a.text), None)
-                df = fetch_result(msg) if qa else None
+                df = fetch_result(SPACE_ID, msg) if qa else None
                 st.session_state.history.append({
                     "question": prompt,
-                    "sql": qa.query.query if qa else None,
+                    "sql": format_sql(qa.query.query) if qa else None,
                     "description": qa.query.description if qa else None,
                     "text": ta.text.content if ta else None,
                     "df": df,
@@ -193,9 +273,11 @@ for i, turn in enumerate(st.session_state.history):
 
         sql = turn.get("sql")
         if sql:
-            with st.expander("Generated SQL", expanded=True):
+            st.markdown("**Generated SQL**")
+            st.code(sql, language="sql")
+            with st.expander("Edit and rerun", expanded=False):
                 edited = st.text_area(
-                    "Edit and rerun",
+                    "SQL",
                     value=sql,
                     height=180,
                     key=f"sql_{i}",
@@ -205,11 +287,11 @@ for i, turn in enumerate(st.session_state.history):
                     w = get_client()
                     try:
                         resp = w.statement_execution.execute_statement(
-                            statement=edited, warehouse_id=get_warehouse_id(), wait_timeout="30s"
+                            statement=edited, warehouse_id=get_warehouse_id(SPACE_ID), wait_timeout="30s"
                         )
                         if resp.status.state == StatementState.SUCCEEDED:
                             st.session_state.history[i]["df"] = result_to_df(resp)
-                            st.session_state.history[i]["sql"] = edited
+                            st.session_state.history[i]["sql"] = format_sql(edited)
                             st.rerun()
                         else:
                             err = resp.status.error.message if resp.status.error else str(resp.status.state)

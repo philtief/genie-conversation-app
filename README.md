@@ -26,16 +26,18 @@ git clone https://github.com/philtief/genie-conversation-app.git
 cd genie-conversation-app
 ```
 
-### 2. Configure
+### 2. Configure (optional)
 
-Edit `app.yaml`:
+By default the app lets the user **pick any Genie space they have access to** from a sidebar dropdown (powered by `WorkspaceClient.genie.list_spaces()`). No config needed to try it out.
+
+To pin the app to a single space (e.g. for a customer-facing deployment), set `GENIE_SPACE_ID` in `app.yaml`:
 
 ```yaml
 env:
   - name: GENIE_SPACE_ID
-    value: "<your-genie-space-id>"
+    value: "<your-genie-space-id>"   # optional; sidebar picker shows up if absent
   - name: DATABRICKS_WAREHOUSE_ID
-    value: "<your-warehouse-id>"
+    value: "<your-warehouse-id>"     # optional; falls back to the space's warehouse
 ```
 
 Get the space id from the Genie space URL: `.../genie/rooms/<space-id>?o=...`.
