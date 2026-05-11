@@ -1,0 +1,16 @@
+command:
+  - "streamlit"
+  - "run"
+  - "app.py"
+  - "--server.port"
+  - "8000"
+  - "--server.address"
+  - "0.0.0.0"
+  - "--server.headless"
+  - "true"
+
+env:
+  - name: GENIE_SPACE_ID
+    value: "REPLACE_WITH_YOUR_GENIE_SPACE_ID"
+  - name: DATABRICKS_WAREHOUSE_ID
+    value: "REPLACE_WITH_YOUR_WAREHOUSE_ID"

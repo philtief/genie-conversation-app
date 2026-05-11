@@ -1,0 +1,6 @@
+{
+  "lintCommand": "uvx pyflakes app.py",
+  "testCommand": "python3 test_syntax.py",
+  "autoFix": false,
+  "minCoverage": 0
+}
