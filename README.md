@@ -9,7 +9,13 @@ A ~200-line Streamlit app on top of the [Databricks Genie Conversation API](http
 
 Deploys to [Databricks Apps](https://docs.databricks.com/dev-tools/databricks-apps/).
 
-![TopGenie screenshot](docs/screenshot.png)
+### NL answer + color-coded SQL editor
+
+![Answer with color-coded SQL inside Edit and rerun](docs/topgenie_sql.png)
+
+### Interactive Plotly chart with hover tooltips
+
+![Bar chart with hover tooltip](docs/topgenie_chart.png)
 
 ## Why
 
