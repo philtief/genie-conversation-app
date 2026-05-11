@@ -1,0 +1,38 @@
+{
+  "version": "v1",
+  "host": "https://fevm-agent-marketplace.cloud.databricks.com",
+  "remote_path": "/Workspace/Users/philipp.tiefenbacher@databricks.com/topgenie",
+  "last_modified_times": {
+    ".gitignore": "2026-05-11T19:35:38.180155383+02:00",
+    ".overnight-dev.json": "2026-05-11T19:41:29.978530007+02:00",
+    "LICENSE": "2026-05-11T19:41:11.600991825+02:00",
+    "README.md": "2026-05-11T20:02:40.468360123+02:00",
+    "app.py": "2026-05-11T19:59:53.251913098+02:00",
+    "app.yaml": "2026-05-11T20:02:47.168544798+02:00",
+    "pyproject.toml": "2026-05-11T19:59:29.63458259+02:00",
+    "requirements.txt": "2026-05-11T19:59:23.715004672+02:00",
+    "test_syntax.py": "2026-05-11T19:43:36.379919345+02:00"
+  },
+  "local_to_remote_names": {
+    ".gitignore": ".gitignore",
+    ".overnight-dev.json": ".overnight-dev.json",
+    "LICENSE": "LICENSE",
+    "README.md": "README.md",
+    "app.py": "app.py",
+    "app.yaml": "app.yaml",
+    "pyproject.toml": "pyproject.toml",
+    "requirements.txt": "requirements.txt",
+    "test_syntax.py": "test_syntax.py"
+  },
+  "remote_to_local_names": {
+    ".gitignore": ".gitignore",
+    ".overnight-dev.json": ".overnight-dev.json",
+    "LICENSE": "LICENSE",
+    "README.md": "README.md",
+    "app.py": "app.py",
+    "app.yaml": "app.yaml",
+    "pyproject.toml": "pyproject.toml",
+    "requirements.txt": "requirements.txt",
+    "test_syntax.py": "test_syntax.py"
+  }
+}

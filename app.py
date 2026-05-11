@@ -10,6 +10,7 @@ Configure with two environment variables:
 from __future__ import annotations
 
 import os
+import time
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -19,6 +20,13 @@ import streamlit as st
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.dashboards import MessageStatus
 from databricks.sdk.service.sql import StatementState
+
+TERMINAL_STATUSES = {
+    MessageStatus.COMPLETED,
+    MessageStatus.FAILED,
+    MessageStatus.CANCELLED,
+    MessageStatus.QUERY_RESULT_EXPIRED,
+}
 
 
 def format_sql(sql: str) -> str:
@@ -89,13 +97,52 @@ def result_to_df(statement_response) -> pd.DataFrame:
     return pd.DataFrame(coerced, columns=names)
 
 
+def _poll_message(space_id: str, conversation_id: str, message_id: str, timeout_s: int = 180):
+    w = get_client()
+    deadline = time.time() + timeout_s
+    last = None
+    while time.time() < deadline:
+        last = w.genie.get_message(
+            space_id=space_id, conversation_id=conversation_id, message_id=message_id
+        )
+        if last.status in TERMINAL_STATUSES:
+            return last
+        time.sleep(1.5)
+    return last
+
+
 def ask_genie(space_id: str, question: str, conversation_id: str | None):
+    """Start or continue a Genie conversation and poll to a terminal status.
+
+    Returns the GenieMessage regardless of success or failure; caller inspects
+    `msg.status` and renders details on FAILED.
+    """
     w = get_client()
     if conversation_id:
-        return w.genie.create_message_and_wait(
+        partial = w.genie.create_message(
             space_id=space_id, conversation_id=conversation_id, content=question
         )
-    return w.genie.start_conversation_and_wait(space_id=space_id, content=question)
+        cid = partial.conversation_id or conversation_id
+        mid = partial.id or partial.message_id
+    else:
+        partial = w.genie.start_conversation(space_id=space_id, content=question)
+        cid = partial.conversation_id
+        mid = partial.message_id or (partial.message.id if partial.message else None)
+    return _poll_message(space_id, cid, mid)
+
+
+def _extract_error_details(msg) -> str:
+    """Pull human-readable error context out of a non-COMPLETED message."""
+    parts = []
+    err = getattr(msg, "error", None)
+    if err:
+        parts.append(getattr(err, "message", None) or str(err))
+    for a in (msg.attachments or []):
+        if a.text and a.text.content:
+            parts.append(a.text.content)
+        if a.query and a.query.query:
+            parts.append(f"SQL Genie tried:\n```sql\n{a.query.query}\n```")
+    return "\n\n".join(p for p in parts if p) or "(no additional details from the API)"
 
 
 def fetch_result(space_id: str, msg) -> pd.DataFrame | None:
@@ -247,7 +294,19 @@ if prompt:
             msg = ask_genie(SPACE_ID, prompt, st.session_state.conversation_id)
             st.session_state.conversation_id = msg.conversation_id
             if msg.status != MessageStatus.COMPLETED:
-                st.error(f"Genie returned status {msg.status}")
+                status_name = getattr(msg.status, "value", str(msg.status))
+                st.error(f"Genie returned status: **{status_name}**")
+                st.markdown(_extract_error_details(msg))
+                if msg.status == MessageStatus.FAILED:
+                    st.info(
+                        "**Common causes of FAILED:**\n\n"
+                        "1. **Missing data grants.** The app's service principal needs "
+                        "`USE SCHEMA` + `SELECT` on the catalog/schema this Genie space queries. "
+                        "Run `GRANT SELECT ON SCHEMA <catalog>.<schema> TO \\`<sp-client-id>\\``.\n"
+                        "2. **Question off-schema.** Genie cannot answer outside the tables curated in the space.\n"
+                        "3. **SQL runtime error.** Genie's generated SQL hit a syntax or type error. "
+                        "Check the SQL in the error block above; tail `<app-url>/logz` for the warehouse error."
+                    )
             else:
                 qa = next((a for a in (msg.attachments or []) if a.query), None)
                 ta = next((a for a in (msg.attachments or []) if a.text), None)

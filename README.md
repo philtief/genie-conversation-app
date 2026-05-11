@@ -110,6 +110,47 @@ result = w.genie.get_message_attachment_query_result(
 
 The "Rerun edited SQL" button feeds the edited SQL into the [SQL Statement Execution API](https://docs.databricks.com/api/workspace/statementexecution) against the same warehouse, so governance and access controls are identical to Genie's own execution.
 
+## Troubleshooting
+
+### `Genie returned status: FAILED`
+
+The Conversation API accepted the question, generated SQL, and the warehouse rejected it. The app surfaces the underlying error block (NL explanation and the SQL Genie tried). Most failures fall into three buckets:
+
+| Cause | How to confirm | Fix |
+|-------|----------------|-----|
+| App's service principal missing data grants | The SQL Genie tried references a table you have not granted to the SP | `GRANT USE SCHEMA ON SCHEMA <catalog>.<schema> TO \`<sp-client-id>\``, then `GRANT SELECT ON SCHEMA <catalog>.<schema> TO \`<sp-client-id>\`` |
+| Question is off-schema for this space | Genie's NL response says it cannot find a relevant table | Switch space (sidebar dropdown) or rephrase to columns the space curates |
+| Generated SQL hit a runtime error | Error block shows a SQL exception | Tail `<app-url>/logz` for the full warehouse error |
+
+Find the app's SP client id with:
+
+```bash
+databricks apps get <app-name> --output json | jq -r '.service_principal_client_id'
+```
+
+Grant a fresh schema in one call from a notebook or `databricks api`:
+
+```python
+from databricks.sdk import WorkspaceClient
+w = WorkspaceClient()
+SP = "<sp-client-id>"
+for stmt in [
+    f"GRANT USE SCHEMA ON SCHEMA <catalog>.<schema> TO `{SP}`",
+    f"GRANT SELECT     ON SCHEMA <catalog>.<schema> TO `{SP}`",
+]:
+    w.statement_execution.execute_statement(
+        statement=stmt, warehouse_id="<warehouse-id>", wait_timeout="30s",
+    )
+```
+
+### App shows "Pick a Genie space" on first load
+
+The sidebar dropdown is empty because the SP has `CAN_RUN` on no spaces. Grant the SP `CAN_RUN` on at least one Genie space (Workspace UI > Genie space > Share, or via the permissions API).
+
+### `App Not Available` (HTTP 502)
+
+Streamlit-on-Databricks-Apps must listen on port `8000`. Verify `app.yaml` has `--server.port 8000` (it does in this repo, but worth re-checking after edits).
+
 ## Limits
 
 - The API does not return chart specs. TopGenie picks a default with a small rule (numeric + categorical &rarr; bar; numeric over time &rarr; line; two numerics &rarr; scatter), then lets the user override.
