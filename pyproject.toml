@@ -10,8 +10,8 @@ dependencies = [
     "databricks-sdk>=0.40",
     "pandas>=2.1",
     "sqlparse>=0.5",
-    "matplotlib>=3.8",
-    "seaborn>=0.13",
+    "plotly>=5.20",
+    "streamlit-ace>=0.1.1",
 ]
 
 [tool.ruff]

@@ -12,14 +12,16 @@ from __future__ import annotations
 import os
 import time
 
-import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sns
+import plotly.express as px
 import sqlparse
 import streamlit as st
 from databricks.sdk import WorkspaceClient
 from databricks.sdk.service.dashboards import MessageStatus
 from databricks.sdk.service.sql import StatementState
+from streamlit_ace import st_ace
+
+PALETTE = px.colors.sequential.Plasma_r
 
 TERMINAL_STATUSES = {
     MessageStatus.COMPLETED,
@@ -163,22 +165,17 @@ def fetch_result(space_id: str, msg) -> pd.DataFrame | None:
     return result_to_df(sr)
 
 
-sns.set_theme(style="whitegrid", context="talk", palette="rocket")
-
-
-def _format_axis(ax, x_label, y_label, title=None):
-    ax.set_xlabel(x_label, fontsize=11, color="#444")
-    ax.set_ylabel(y_label, fontsize=11, color="#444")
-    if title:
-        ax.set_title(title, fontsize=13, weight="bold", pad=12)
-    ax.tick_params(axis="x", labelsize=9, rotation=30)
-    ax.tick_params(axis="y", labelsize=9)
-    for spine in ("top", "right"):
-        ax.spines[spine].set_visible(False)
-    for spine in ("left", "bottom"):
-        ax.spines[spine].set_color("#bbb")
-    ax.yaxis.grid(True, linestyle=":", linewidth=0.6, color="#ccc")
-    ax.xaxis.grid(False)
+def _style_fig(fig):
+    fig.update_layout(
+        plot_bgcolor="#fafafa",
+        paper_bgcolor="#fafafa",
+        font=dict(family="Inter, -apple-system, system-ui, sans-serif", size=12, color="#333"),
+        margin=dict(l=40, r=20, t=30, b=40),
+        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, sans-serif"),
+        xaxis=dict(showgrid=False, linecolor="#bbb"),
+        yaxis=dict(gridcolor="#e5e5e5", linecolor="#bbb"),
+    )
+    return fig
 
 
 def render_chart(df: pd.DataFrame, key: str):
@@ -208,25 +205,26 @@ def render_chart(df: pd.DataFrame, key: str):
 
     try:
         plot_df = df[[x, y]].dropna()
-        fig, ax = plt.subplots(figsize=(9, 4.5), dpi=110)
-        fig.patch.set_facecolor("#fafafa")
-        ax.set_facecolor("#fafafa")
-
         if chart_type == "Bar":
-            order = plot_df.sort_values(y, ascending=False)[x].tolist()
-            sns.barplot(data=plot_df, x=x, y=y, ax=ax, order=order, hue=x, palette="rocket", legend=False)
+            plot_df = plot_df.sort_values(y, ascending=False)
+            fig = px.bar(
+                plot_df, x=x, y=y, color=y, color_continuous_scale=PALETTE,
+                hover_data={x: True, y: ":,.2f"},
+            )
+            fig.update_layout(coloraxis_showscale=False)
         elif chart_type == "Line":
-            sns.lineplot(data=plot_df, x=x, y=y, ax=ax, marker="o", linewidth=2.2, color="#9C27B0")
+            fig = px.line(plot_df, x=x, y=y, markers=True)
+            fig.update_traces(line=dict(width=2.5, color="#9C27B0"), marker=dict(size=8))
         elif chart_type == "Area":
-            sns.lineplot(data=plot_df, x=x, y=y, ax=ax, linewidth=2.2, color="#9C27B0")
-            ax.fill_between(plot_df[x], plot_df[y], alpha=0.25, color="#9C27B0")
+            fig = px.area(plot_df, x=x, y=y)
+            fig.update_traces(line=dict(width=2.5, color="#9C27B0"), fillcolor="rgba(156, 39, 176, 0.25)")
         elif chart_type == "Scatter":
-            sns.scatterplot(data=plot_df, x=x, y=y, ax=ax, s=70, color="#E91E63", edgecolor="white")
+            fig = px.scatter(plot_df, x=x, y=y, color=y, color_continuous_scale=PALETTE, size_max=14)
+            fig.update_traces(marker=dict(size=10, line=dict(width=1, color="white")))
+            fig.update_layout(coloraxis_showscale=False)
 
-        _format_axis(ax, x, y)
-        fig.tight_layout()
-        st.pyplot(fig, use_container_width=True)
-        plt.close(fig)
+        _style_fig(fig)
+        st.plotly_chart(fig, use_container_width=True, config={"displaylogo": False})
     except Exception as e:
         st.warning(f"Could not render chart: {e}")
 
@@ -332,15 +330,20 @@ for i, turn in enumerate(st.session_state.history):
 
         sql = turn.get("sql")
         if sql:
-            st.markdown("**Generated SQL**")
-            st.code(sql, language="sql")
-            with st.expander("Edit and rerun", expanded=False):
-                edited = st.text_area(
-                    "SQL",
+            with st.expander("Edit and rerun SQL", expanded=False):
+                edited = st_ace(
                     value=sql,
-                    height=180,
+                    language="sql",
+                    theme="github",
+                    keybinding="vscode",
+                    font_size=13,
+                    tab_size=2,
+                    show_gutter=True,
+                    show_print_margin=False,
+                    wrap=True,
+                    auto_update=True,
+                    min_lines=8,
                     key=f"sql_{i}",
-                    label_visibility="collapsed",
                 )
                 if st.button("Rerun edited SQL", key=f"rerun_{i}"):
                     w = get_client()
