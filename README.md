@@ -22,8 +22,8 @@ Companion blog post: *TopGenie: Building a Custom Databricks App on the Genie Co
 ### 1. Clone
 
 ```bash
-git clone https://github.com/philtief/topgenie.git
-cd topgenie
+git clone https://github.com/philtief/genie-conversation-app.git
+cd genie-conversation-app
 ```
 
 ### 2. Configure
