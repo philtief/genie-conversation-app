@@ -24,7 +24,7 @@ Deploys to [Databricks Apps](https://docs.databricks.com/dev-tools/databricks-ap
 
 When a multi-agent supervisor calls a Genie space, or when you want to embed Genie answers inside a custom application, you lose Genie's UI (editable SQL, chart picker, downloads). The Conversation API returns enough to rebuild those affordances. TopGenie does it in one file.
 
-Companion blog post: *TopGenie: Building a Custom Databricks App on the Genie Conversation API* (link).
+Companion blog post: [**Databricks Genie Without the UI** &mdash; the Conversation API in three calls, a streaming trick that halves perceived latency, and a fallback for restricted-egress Databricks Apps](https://medium.com/@philipp.tiefenbacher_42173/databricks-genie-without-the-ui-a3066ea3d8ca).
 
 ## Quickstart
 
