@@ -1,6 +1,7 @@
 streamlit>=1.39
 databricks-sdk>=0.40
 pandas>=2.1
+pyarrow>=15.0
 sqlparse>=0.5
 plotly>=5.20
 streamlit-ace>=0.1.1

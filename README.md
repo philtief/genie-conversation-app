@@ -1,11 +1,14 @@
 # TopGenie
 
-A ~200-line Streamlit app on top of the [Databricks Genie Conversation API](https://docs.databricks.com/api/workspace/genie). Ask a Genie space a natural-language question and get back:
+A single-file Streamlit app on top of the [Databricks Genie Conversation API](https://docs.databricks.com/api/workspace/genie). Ask a Genie space a natural-language question and get back:
 
-- the **generated SQL** (editable, with a "Rerun" button)
+- the **generated SQL** (editable, with a "Rerun" button) &mdash; streamed into the UI the moment Genie produces it, before the warehouse finishes executing
 - the **result** as a table and an auto-picked chart (bar/line/area/scatter)
 - a **Download CSV** button
 - conversation continuity across follow-up turns
+- a **live progress indicator** with elapsed time and stage labels (`Genie is reading the schema...` &rarr; `Genie wrote the SQL, query running...` &rarr; `Loading rows...`)
+- **two result-fetch modes** to bound app memory: *Inline + cap* (fast, truncated) and *External links* (full result via Arrow IPC, with automatic fallback to paginated inline when cloud-storage egress is blocked)
+- per-turn **truncation warning** with one-click *Re-fetch with current cap* or *Load full via External Links*
 
 Deploys to [Databricks Apps](https://docs.databricks.com/dev-tools/databricks-apps/).
 
@@ -160,7 +163,8 @@ Streamlit-on-Databricks-Apps must listen on port `8000`. Verify `app.yaml` has `
 ## Limits
 
 - The API does not return chart specs. TopGenie picks a default with a small rule (numeric + categorical &rarr; bar; numeric over time &rarr; line; two numerics &rarr; scatter), then lets the user override.
-- Results arrive synchronously up to a default chunk size (a few thousand rows). For larger results, page through the Statement Execution API after the first chunk.
+- Inline results are capped at ~25 MB per chunk. For larger results, switch to **External links** in the sidebar's *Expert* expander, or click *Load full via External Links* on a truncated turn. If the app container cannot reach the presigned cloud-storage URLs (restricted-egress workspace), TopGenie falls back to paginated inline fetch through the control plane.
+- Genie's [Agent Mode](https://docs.databricks.com/aws/en/genie/agent-mode#is-agent-mode-available-through-the-api) is in Public Preview and not yet exposed through the Conversation API. Every API call runs the standard single-step Genie path.
 - Clarification turns from Genie come back as text-only attachments (no `query`). TopGenie shows the text.
 
 ## Development

@@ -1,0 +1,8 @@
+[theme]
+# Glass-morphism inspired palette: subtle violet primary, soft neutrals.
+primaryColor = "#7C3AED"
+backgroundColor = "#F7F7FA"
+secondaryBackgroundColor = "#FFFFFFCC"
+textColor = "#1F2937"
+font = "sans serif"
+base = "light"
